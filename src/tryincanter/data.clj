@@ -2,13 +2,15 @@
   (:require [incanter.core :as i :refer [$ $= $where $group-by $join $rollup $map $order]]
             [incanter.datasets :as ds]
             [incanter.io :as io]
-
+            [incanter.zoo :as zoo]
             [clojure.data.csv :as csv]
             [clojure.data.json :as json]
             [clojure.java.io :as jio]
             [incanter.charts :as ch]
             [incanter.stats :as s]
-            [clojure.set :refer (union) :as set]))
+            [clojure.set :refer (union) :as set]
+            [clojure.string :as string]
+            [clj-time.format :as f]))
 
 ;built-in datasets
 (def iris (ds/get-dataset :iris))
@@ -234,7 +236,36 @@
        (i/dataset [:POP100.LOG10])
        (i/conj-cols ordered-data)))
 
-(i/view log-scaled-data)
+;(i/view log-scaled-data)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;incanter zoo;;;;;;;;;;;;;;;
+
+(def data-file4 "D:/data/ibm.csv")
+
+(def ^:dynamic *formatter* (f/formatter "yyyy-MM-dd"))
+
+(defn parse-date
+  [date]
+  (f/parse *formatter* date))
+
+(def stock-price-data
+  (i/with-data
+   (i/col-names (io/read-dataset data-file4 :header true) [:date-str :open :high :low :close :volume])
+   (->> ($map parse-date :date-str)
+        (i/dataset [:date])
+        (i/conj-cols i/$data))))
+
+
+(def stock-price-data-zoo (zoo/zoo stock-price-data :date))
+
+(defn data-roll
+  [data roll-period]
+  (->> (i/sel data :cols :close)
+       (zoo/roll-mean roll-period)
+       (i/dataset [(keyword (str roll-period "-day"))])
+       (i/conj-cols data)))
+
+(data-roll stock-price-data-zoo 30)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;tips;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -249,7 +280,10 @@
 
 
 
+(i/col-names (i/to-dataset [[1 2 3] [4 5 6]]) [:a :b :c])
+;is the same as
 
+(i/dataset [:a :b :c] [[1 2 3] [4 5 6]])
 
 
 
