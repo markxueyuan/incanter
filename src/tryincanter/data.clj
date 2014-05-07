@@ -1,10 +1,14 @@
 (ns tryincanter.data
-  (:require [incanter.core :as i :refer [$ $= $where $group-by]]
+  (:require [incanter.core :as i :refer [$ $= $where $group-by $join $rollup $map $order]]
             [incanter.datasets :as ds]
             [incanter.io :as io]
+
             [clojure.data.csv :as csv]
             [clojure.data.json :as json]
-            [clojure.java.io :as jio]))
+            [clojure.java.io :as jio]
+            [incanter.charts :as ch]
+            [incanter.stats :as s]
+            [clojure.set :refer (union) :as set]))
 
 ;built-in datasets
 (def iris (ds/get-dataset :iris))
@@ -150,33 +154,98 @@
 (def census2010 ($ [:STATE :NAME :POP100 :P003002 :P003003 :P003004 :P003005 :P003006 :P003007 :P003008] race-data))
 
 ;write to csv
-(with-open [f-out (jio/writer "D:/data/census_2010.csv")]
+#_(with-open [f-out (jio/writer "D:/data/census_2010.csv")]
   (csv/write-csv f-out [(map name (i/col-names census2010))])
   (csv/write-csv f-out (i/to-list census2010)))
 
 ;write to json
 
 
-(with-open [f-out (jio/writer "D:/data/census_2010.csv")]
+#_(with-open [f-out (jio/writer "D:/data/census_2010.json")]
   (json/write (:rows census2010) f-out))
 
+;;;;;;;;;;;;;;join
+
+(def data-file3 "D:/data/all_160_in_51.P3.csv")
 
 
+(def racial-data (io/read-dataset data-file3 :header true))
+
+(set/intersection (set (i/col-names va-data))
+                  (set (i/col-names racial-data)))
+
+(defn dedup-second
+  [a b id-col]
+  (let [a-cols (set (i/col-names a))]
+    (conj (filter #(not (contains? a-cols %)) (i/col-names b)) id-col)))
+
+(def racial-short ($ (vec (dedup-second va-data racial-data :GEOID)) racial-data))
+
+(def all-data ($join [:GEOID :GEOID] va-data racial-short))
+
+(i/col-names all-data)
+
+(= (i/nrow va-data) (i/nrow racial-data) (i/nrow all-data))
 
 
-(i/to-list census2010)
+;;;;;;;;;;;;;;;;;;;roll up;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+($rollup  :mean :POP100 :STATE race-data)
+
+($rollup s/sd :POP100 :STATE race-data)
 
 
+;;;;;;;;;;;;;;;;;;;differencing variables;;;;;;;;;;;;;;;;
 
+(defn replace-empty
+  [x]
+  (if (nil? x)
+    0
+    x))
+
+(def growth-rates
+  (->> racial-data
+       identity
+       ($map replace-empty :POP100.2000)
+       (i/minus (i/sel racial-data :cols :POP100))
+       (i/dataset [:POP.DELTA])
+       (i/conj-cols racial-data)))
+
+(i/sel growth-rates
+       :cols [:NAME :POP100 :POP100.2000 :POP.DELTA]
+       :rows (range 5))
+
+;;;;;;;;;;;;;;;;;;;;;;;;scaling variables;;;;;;;;;;;;;;;;;;;;;
+
+(def ordered-data
+  ($order :POP100 :asc racial-data))
+
+
+(def scaled-data
+  (->> (i/sel ordered-data :cols :POP100)
+       (#(i/div % 1000.0))
+       (i/dataset [:POP100.1000])
+       (i/conj-cols ordered-data))
+  )
+
+(def log-scaled-data
+  (->> (i/sel ordered-data :cols :POP100)
+       i/log10
+       (i/dataset [:POP100.LOG10])
+       (i/conj-cols ordered-data)))
+
+(i/view log-scaled-data)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;tips;;;;;;;;;;;;;;;;;;;;;;;
 
 (i/to-list census2010)
 (:rows census2010)
+(i/minus [1 2 3] [4 5 6])
 
+;compare
 
-
-
+(i/sel ordered-data :cols :POP100)
+(i/sel ordered-data :cols [:POP100])
 
 
 
