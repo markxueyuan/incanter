@@ -242,13 +242,13 @@
 
 (def data-file4 "D:/data/ibm.csv")
 
-(def ^:dynamic *formatter* (f/formatter "yyyy-MM-dd"))
+;(def ^:dynamic *formatter* (f/formatter "yyyy-MM-dd"))
 
-(defn parse-date
+#_(defn parse-date
   [date]
   (f/parse *formatter* date))
 
-(def stock-price-data
+#_(def stock-price-data
   (i/with-data
    (i/col-names (io/read-dataset data-file4 :header true) [:date-str :open :high :low :close :volume])
    (->> ($map parse-date :date-str)
@@ -256,17 +256,47 @@
         (i/conj-cols i/$data))))
 
 
-(def stock-price-data-zoo (zoo/zoo stock-price-data :date))
+;(def stock-price-data-zoo (zoo/zoo stock-price-data :date))
 
-(defn data-roll
+#_(defn data-roll
   [data roll-period]
   (->> (i/sel data :cols :close)
        (zoo/roll-mean roll-period)
        (i/dataset [(keyword (str roll-period "-day"))])
        (i/conj-cols data)))
 
-(data-roll stock-price-data-zoo 30)
+;(data-roll stock-price-data-zoo 30)
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;smooth noise;;;;;;;;;;;;;;;
+
+(defn tokenize
+  [text]
+  (map string/lower-case (re-seq #"\w+" text)))
+
+(tokenize "to be or not to be, this is a question!")
+
+(defn count-hits
+  [item coll]
+  (get (frequencies coll) item 0))
+
+(def data-file5 "D:/data/pg1661.txt")
+
+(def windows
+  (->> (slurp data-file5)
+       tokenize
+       (partition 500 250)))
+
+(def baker-hits
+  (map (partial count-hits "baker") windows))
+
+(defn rolling-fn
+  [f n coll]
+  (map f (partition n 1 coll)))
+
+(def baker-average (rolling-fn s/mean 10 baker-hits))
+
+baker-average
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;tips;;;;;;;;;;;;;;;;;;;;;;;
 
 (i/to-list census2010)
