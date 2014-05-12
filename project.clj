@@ -11,4 +11,4 @@
                  [clj-time "0.6.0"]
                  [clj-wordnet "0.1.1-SNAPSHOT"]]
   :repl-options {:nrepl-middleware [lighttable.nrepl.handler/lighttable-ops]}
-  :jvm-opts ["-Xmx1g"])
+  :jvm-opts ["-Xmx256M"])
